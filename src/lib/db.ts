@@ -1,0 +1,18 @@
+import { PrismaClient } from "@prisma/client";
+
+declare global {
+  // eslint-disable-next-line no-var
+  var cachedPrisma: PrismaClient | undefined;
+}
+
+// Reuse a single PrismaClient across hot reloads in dev to avoid exhausting
+// database connections.
+export const prisma =
+  global.cachedPrisma ||
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  global.cachedPrisma = prisma;
+}

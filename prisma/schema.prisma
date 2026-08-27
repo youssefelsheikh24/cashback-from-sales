@@ -1,0 +1,84 @@
+// CashBack Sales & Production Request — Prisma schema
+// Completely separate from the Marketing Inquiry form's database.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A production/booking request submitted by a potential client.
+model ProductionRequest {
+  id                 String         @id @default(cuid())
+  reference          String         @unique // Human-friendly ref e.g. CB-7F3A
+
+  // ── Contact ──
+  fullName           String
+  phone              String
+  email              String
+  brandName          String
+  whatsapp           String?
+
+  // ── Services (JSON array of service ids, e.g. ["video-production","location"]) ──
+  services           String
+
+  // ── Dynamic, service-specific production details (JSON object) ──
+  details            String // JSON: { videoProduction?, montage?, photography?, location?, studio?, crew?, fullProduction? }
+
+  // ── The brief ──
+  projectDescription String
+  referenceLink      String?
+  files              String         @default("[]") // JSON array of { name, size, type, storedName }
+
+  // ── Scheduling ──
+  preferredShootDate String?
+  deliveryDeadline   String?
+  flexibility        String?
+
+  // ── Commercial ──
+  budget             String
+
+  // ── CRM ──
+  status             String         @default("New") // New | Reviewing | Quoted | Booked | Completed | Lost
+  internalNotes      String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  notifications      Notification[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+}
+
+// A Sales-facing notification raised when a new production request arrives.
+model Notification {
+  id        String             @id @default(cuid())
+  requestId String?
+  request   ProductionRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  brand     String?
+  service   String?
+  budget    String?
+  reference String?
+  isRead    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Authorized CashBack Sales team members who can access the CRM.
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String   @default("CashBack Sales")
+  role         String   @default("sales")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
