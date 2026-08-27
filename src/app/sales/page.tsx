@@ -238,10 +238,32 @@ function Dashboard() {
     setAlertsOn(result === "granted");
     if (result === "unsupported") {
       alert(
-        "Push isn't supported here. On iPhone: open in Safari, tap Share → Add to Home Screen, then open the app and enable alerts."
+        "Push isn't supported here. On iPhone: open in Safari, tap Share → Add to Home Screen, then open the installed app and tap Enable push alerts."
       );
     } else if (result === "error") {
-      alert("Push is not configured on the server (missing VAPID key).");
+      alert("Push key missing on the client (NEXT_PUBLIC_VAPID_PUBLIC_KEY not set at build). Set it in Railway and redeploy.");
+    } else if (result === "denied") {
+      alert("Notifications are blocked for this site. Enable them in your browser/OS settings, then try again.");
+    } else if (result === "granted") {
+      alert("Subscribed. Now tap 'Test push' to verify delivery.");
+    }
+  };
+
+  const testPush = async () => {
+    try {
+      const diag = await fetch("/api/push/test", { cache: "no-store" }).then((r) => r.json());
+      if (!diag.vapidConfigured) {
+        alert("Server has no VAPID keys — set VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY in Railway.");
+        return;
+      }
+      if (diag.subscriptions === 0) {
+        alert("No subscribed devices yet. Tap 'Enable push alerts' first (on iPhone: only inside the installed PWA).");
+        return;
+      }
+      const res = await fetch("/api/push/test", { method: "POST" }).then((r) => r.json());
+      alert(`Sent to ${res.sent}/${res.subscriptions} device(s). If nothing arrives, check OS notification settings for the app.`);
+    } catch {
+      alert("Test failed — are you still logged in?");
     }
   };
 
@@ -268,16 +290,26 @@ function Dashboard() {
               Every booking &amp; quote request, captured and ready to quote.
             </p>
           </div>
-          {!alertsOn && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {!alertsOn && (
+              <button
+                type="button"
+                onClick={enableAlerts}
+                className="btn-ghost focus-gold inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-gold-300"
+              >
+                <Bell className="h-3.5 w-3.5 text-gold-400" />
+                Enable push alerts
+              </button>
+            )}
             <button
               type="button"
-              onClick={enableAlerts}
-              className="btn-ghost focus-gold inline-flex items-center gap-2 self-start rounded-full px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-gold-300 sm:self-auto"
+              onClick={testPush}
+              className="btn-ghost focus-gold inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-gold-300"
             >
               <Bell className="h-3.5 w-3.5 text-gold-400" />
-              Enable desktop alerts
+              Test push
             </button>
-          )}
+          </div>
         </div>
 
         <div className="mb-6">
