@@ -1,38 +1,52 @@
 // CashBack Sales & Production Request — Prisma schema
-// Completely separate from the Marketing Inquiry form's database.
+// Deployed to Cloudflare Pages (edge) with Supabase Postgres.
+//
+// SAFETY: every model is scoped to the ISOLATED "cashback_sales" schema via
+// @@schema. Prisma only manages objects inside that schema — the Supabase
+// "public" schema and everything else in the project is never touched.
 // Docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // multiSchema → keep all our tables in a dedicated, isolated schema.
+  // Edge execution is provided by Prisma Accelerate (HTTP), so no driver
+  // adapter / node TCP driver is needed — the client bundles cleanly for
+  // Cloudflare's edge runtime.
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  // Runtime (edge): Supabase connection pooler (transaction mode, port 6543).
+  url       = env("DATABASE_URL")
+  // Migrations only (prisma migrate/db push): Supabase direct connection (5432).
+  directUrl = env("DIRECT_URL")
+  // The ONLY schema Prisma is allowed to create/alter/read. Nothing else.
+  schemas   = ["cashback_sales"]
 }
 
 // A production/booking request submitted by a potential client.
 model ProductionRequest {
-  id                 String         @id @default(cuid())
-  reference          String         @unique // Human-friendly ref e.g. CB-7F3A
+  id        String @id @default(cuid())
+  reference String @unique // Human-friendly ref e.g. CB-7F3A
 
   // ── Contact ──
-  fullName           String
-  phone              String
-  email              String
-  brandName          String
-  whatsapp           String?
+  fullName  String
+  phone     String
+  email     String
+  brandName String
+  whatsapp  String?
 
   // ── Services (JSON array of service ids, e.g. ["video-production","location"]) ──
-  services           String
+  services String
 
   // ── Dynamic, service-specific production details (JSON object) ──
-  details            String // JSON: { videoProduction?, montage?, photography?, location?, studio?, crew?, fullProduction? }
+  details String // JSON: { videoProduction?, montage?, photography?, location?, studio?, crew?, fullProduction? }
 
   // ── The brief ──
   projectDescription String
   referenceLink      String?
-  files              String         @default("[]") // JSON array of { name, size, type, storedName }
+  files              String  @default("[]") // JSON array of { name, size, type, storedName }
 
   // ── Scheduling ──
   preferredShootDate String?
@@ -40,18 +54,19 @@ model ProductionRequest {
   flexibility        String?
 
   // ── Commercial ──
-  budget             String
+  budget String
 
   // ── CRM ──
-  status             String         @default("New") // New | Reviewing | Quoted | Booked | Completed | Lost
-  internalNotes      String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  notifications      Notification[]
+  status        String         @default("New") // New | Reviewing | Quoted | Booked | Completed | Lost
+  internalNotes String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  notifications Notification[]
 
   @@index([status])
   @@index([createdAt])
   @@index([email])
+  @@schema("cashback_sales")
 }
 
 // A Sales-facing notification raised when a new production request arrives.
@@ -70,6 +85,7 @@ model Notification {
 
   @@index([isRead])
   @@index([createdAt])
+  @@schema("cashback_sales")
 }
 
 // Authorized CashBack Sales team members who can access the CRM.
@@ -81,4 +97,6 @@ model AdminUser {
   role         String   @default("sales")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@schema("cashback_sales")
 }

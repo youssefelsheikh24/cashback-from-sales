@@ -338,7 +338,7 @@ export function RequestDetailModal({
                     {request.files.map((f) => (
                       <li key={f.storedName}>
                         <a
-                          href={`/api/requests/${request.id}/files/${f.storedName}`}
+                          href={`/api/requests/${request.id}/files/${encodeURIComponent(f.storedName)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-2.5 transition-colors hover:border-gold-500/40"

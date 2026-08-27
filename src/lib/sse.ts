@@ -1,22 +1,13 @@
-import { EventEmitter } from "events";
-
-// A single global EventEmitter fans out realtime Sales events (new requests,
-// status changes) to every connected SSE stream across API handlers.
-declare global {
-  // eslint-disable-next-line no-var
-  var salesSseEmitter: EventEmitter | undefined;
-}
-
-export const sseEmitter = global.salesSseEmitter || new EventEmitter();
-
-// Allow many concurrent Sales tabs without Node's default 10-listener warning.
-sseEmitter.setMaxListeners(200);
-
-if (process.env.NODE_ENV !== "production") {
-  global.salesSseEmitter = sseEmitter;
-}
-
-export const SSE_CHANNEL = "cashback_sales_event";
+// Realtime on Cloudflare's edge can't use an in-process Node EventEmitter —
+// isolates are stateless and short-lived, so a shared emitter never fans out.
+//
+// The Sales dashboard instead POLLS /api/notifications every 15s (see
+// src/app/sales/page.tsx). These functions are kept as safe no-ops so the
+// submission pipeline keeps its "best-effort broadcast" call sites unchanged.
+//
+// To upgrade to push realtime later: enable Supabase Realtime on the
+// cashback_sales.Notification table and subscribe from the client with the
+// anon key + RLS. Polling is the zero-config, edge-safe default.
 
 export interface SSEEventPayload {
   type: "NEW_REQUEST" | "STATUS_UPDATE" | "NOTIFICATION_READ";
@@ -26,23 +17,15 @@ export interface SSEEventPayload {
 }
 
 export function broadcastNewRequest(
-  request: Record<string, unknown>,
-  notification: Record<string, unknown>
-) {
-  const payload: SSEEventPayload = {
-    type: "NEW_REQUEST",
-    request,
-    notification,
-    timestamp: new Date().toISOString(),
-  };
-  sseEmitter.emit(SSE_CHANNEL, payload);
+  _request: Record<string, unknown>,
+  _notification: Record<string, unknown>
+): void {
+  // no-op on edge; dashboard picks up new requests via polling
 }
 
-export function broadcastStatusUpdate(requestId: string, status: string) {
-  const payload: SSEEventPayload = {
-    type: "STATUS_UPDATE",
-    request: { id: requestId, status },
-    timestamp: new Date().toISOString(),
-  };
-  sseEmitter.emit(SSE_CHANNEL, payload);
+export function broadcastStatusUpdate(
+  _requestId: string,
+  _status: string
+): void {
+  // no-op on edge
 }

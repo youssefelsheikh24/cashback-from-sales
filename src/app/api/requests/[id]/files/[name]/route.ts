@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
 import { prisma } from "@/lib/db";
 import { checkAdminAuth } from "@/lib/auth";
-import { resolveStoredFile } from "@/lib/storage";
+import { signedUrlForFile } from "@/lib/storage";
 import { serializeRequest } from "@/lib/serialize";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/requests/:id/files/:name — stream a stored reference file to the
- * authenticated Sales team. Files live outside /public and are guarded against
- * path traversal; only files that belong to the request can be fetched.
+ * GET /api/requests/:id/files/:name — return a short-lived signed URL for a
+ * stored reference file and redirect to it. Files live in a PRIVATE Supabase
+ * bucket; only the authenticated Sales team can mint a link, and only for a
+ * file that actually belongs to the request.
+ *
+ * `:name` is the URL-encoded object path (e.g. "CB-7F3A/ab12cd.pdf").
  */
 export async function GET(
   req: NextRequest,
@@ -36,7 +38,8 @@ export async function GET(
   }
 
   const request = serializeRequest(row);
-  const meta = request.files.find((f) => f.storedName === params.name);
+  const storedName = decodeURIComponent(params.name);
+  const meta = request.files.find((f) => f.storedName === storedName);
   if (!meta) {
     return NextResponse.json(
       { success: false, error: "File not found" },
@@ -44,24 +47,13 @@ export async function GET(
     );
   }
 
-  const fullPath = await resolveStoredFile(request.reference, meta.storedName);
-  if (!fullPath) {
+  const url = await signedUrlForFile(request.reference, meta.storedName, 300);
+  if (!url) {
     return NextResponse.json(
       { success: false, error: "File no longer available" },
       { status: 404 }
     );
   }
 
-  const data = await fs.readFile(fullPath);
-  const asciiName = meta.name.replace(/[^\x20-\x7E]+/g, "_").replace(/"/g, "");
-  return new NextResponse(data, {
-    headers: {
-      "Content-Type": meta.type || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(
-        meta.name
-      )}`,
-      "Content-Length": String(data.length),
-      "Cache-Control": "private, no-store",
-    },
-  });
+  return NextResponse.redirect(url, 307);
 }

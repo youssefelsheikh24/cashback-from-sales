@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { loginSchema } from "@/lib/validations";
 import { createSession } from "@/lib/auth";
+import { verifyPassword } from "@/lib/password";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
     const email = parsed.data.email.toLowerCase();
     const admin = await prisma.adminUser.findUnique({ where: { email } });
 
-    // Uniform error + bcrypt compare regardless of whether the user exists,
-    // to avoid leaking which emails are registered / timing differences.
+    // Uniform compare regardless of whether the user exists, to avoid leaking
+    // which emails are registered / timing differences.
     const hash =
       admin?.passwordHash ||
-      "$2a$12$0000000000000000000000000000000000000000000000000000";
-    const valid = await bcrypt.compare(parsed.data.password, hash);
+      "pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    const valid = await verifyPassword(parsed.data.password, hash);
 
     if (!admin || !valid) {
       return NextResponse.json(

@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import { SERVICE_LABELS } from "@/lib/constants";
 import type { ServiceId } from "@/types";
 
@@ -40,12 +39,9 @@ function serviceNames(ids: ServiceId[]): string {
 export async function sendRequestNotificationEmail(
   req: EmailRequestData
 ): Promise<{ sent: boolean; messageId?: string }> {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || "587", 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const apiKey = process.env.RESEND_API_KEY;
   const from =
-    process.env.SMTP_FROM || "CashBack Production <production@cashback.agency>";
+    process.env.RESEND_FROM || "CashBack Production <onboarding@resend.dev>";
   const to =
     process.env.ADMIN_NOTIFICATION_EMAIL ||
     process.env.ADMIN_EMAIL ||
@@ -101,11 +97,11 @@ export async function sendRequestNotificationEmail(
   </div>
 </body></html>`;
 
-  // No SMTP configured → log instead of faking a send.
-  if (!host || !user || !pass) {
+  // No API key configured → log instead of faking a send.
+  if (!apiKey) {
     console.log(`
 ==================================================
-[EMAIL — DEV MODE: SMTP not configured, not sent]
+[EMAIL — DEV MODE: RESEND_API_KEY not set, not sent]
 To:        ${to}
 Subject:   ${subject}
 Client:    ${req.fullName} (${req.brandName})
@@ -113,23 +109,30 @@ Ref:       ${req.reference}
 Requested: ${serviceNames(req.services)}
 Budget:    ${req.budget}
 View:      ${requestUrl}
-Configure SMTP_* in .env to send real emails.
+Set RESEND_API_KEY in .env to send real emails.
 ==================================================
 `);
     return { sent: false };
   }
 
+  // Resend HTTP API — edge/Workers compatible (no SMTP sockets).
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to, subject, html }),
     });
-
-    const info = await transporter.sendMail({ from, to, subject, html });
-    console.log(`✓ Production request email sent: ${info.messageId}`);
-    return { sent: true, messageId: info.messageId };
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("✗ Resend send failed:", res.status, detail);
+      return { sent: false };
+    }
+    const json = (await res.json().catch(() => ({}))) as { id?: string };
+    console.log(`✓ Production request email sent: ${json.id ?? "ok"}`);
+    return { sent: true, messageId: json.id };
   } catch (error) {
     console.error("✗ Failed to send production request email:", error);
     return { sent: false };

@@ -5,7 +5,7 @@ import { requestUpdateSchema } from "@/lib/validations";
 import { serializeRequest } from "@/lib/serialize";
 import { broadcastStatusUpdate } from "@/lib/sse";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET a single request's full details (Sales only). */

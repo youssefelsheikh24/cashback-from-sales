@@ -99,54 +99,78 @@ function Dashboard() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  /* ── Realtime SSE ── */
+  /* ── Realtime via polling (edge-safe; no SSE/EventEmitter on Cloudflare) ── */
+  const seenNotifIds = useRef<Set<string> | null>(null);
   useEffect(() => {
     setAlertsOn(
       typeof Notification !== "undefined" && Notification.permission === "granted"
     );
+    setConnected(true);
 
-    const es = new EventSource("/api/notifications/sse");
+    let cancelled = false;
 
-    es.addEventListener("connected", () => setConnected(true));
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-
-    es.onmessage = (evt) => {
+    const poll = async () => {
+      if (cancelled) return;
       try {
-        const payload = JSON.parse(evt.data);
-        if (payload.type === "NEW_REQUEST") {
-          fetchRequestsRef.current();
-          fetchNotifsRef.current();
-          const id = payload.request?.id as string | undefined;
-          if (id) {
-            setHighlightIds((prev) => new Set(prev).add(id));
-            setTimeout(() => {
+        const res = await fetch("/api/notifications", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.success) return;
+
+        const items: NotificationItem[] = json.notifications || [];
+        const ids = new Set(items.map((n) => n.id));
+
+        // First poll just seeds the baseline — nothing is "new" yet.
+        if (seenNotifIds.current === null) {
+          seenNotifIds.current = ids;
+        } else {
+          const fresh = items.filter((n) => !seenNotifIds.current!.has(n.id));
+          if (fresh.length) {
+            seenNotifIds.current = ids;
+            fetchRequestsRef.current();
+            const newRequestIds = fresh
+              .map((n) => n.requestId)
+              .filter((v): v is string => !!v);
+            if (newRequestIds.length) {
               setHighlightIds((prev) => {
                 const next = new Set(prev);
-                next.delete(id);
+                newRequestIds.forEach((id) => next.add(id));
                 return next;
               });
-            }, 8000);
+              setTimeout(() => {
+                setHighlightIds((prev) => {
+                  const next = new Set(prev);
+                  newRequestIds.forEach((id) => next.delete(id));
+                  return next;
+                });
+              }, 8000);
+            }
+            if (
+              typeof Notification !== "undefined" &&
+              Notification.permission === "granted"
+            ) {
+              const n = fresh[0];
+              new Notification("New Production Request", {
+                body: `${n.message}${n.brand ? ` · ${n.brand}` : ""}`,
+                icon: "/logo.png",
+              });
+            }
           }
-          if (
-            typeof Notification !== "undefined" &&
-            Notification.permission === "granted"
-          ) {
-            const name = payload.request?.fullName || "A new client";
-            new Notification("New Production Request", {
-              body: `${name} · ${payload.notification?.brand ?? ""}`,
-              icon: "/logo.png",
-            });
-          }
-        } else if (payload.type === "STATUS_UPDATE") {
-          fetchRequestsRef.current();
         }
+
+        setNotifications(items);
+        setUnreadCount(json.unreadCount ?? 0);
       } catch {
-        /* ignore malformed event */
+        /* transient network error — keep existing state */
       }
     };
 
-    return () => es.close();
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   /* ── Deep-link: open a request from ?requestId= (email "View Request" links) ── */
