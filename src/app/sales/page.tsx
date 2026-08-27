@@ -9,6 +9,7 @@ import { StatsOverview } from "@/components/sales/StatsOverview";
 import { FilterBar } from "@/components/sales/FilterBar";
 import { RequestsTable } from "@/components/sales/RequestsTable";
 import { RequestDetailModal } from "@/components/sales/RequestDetailModal";
+import { enablePush, resyncPush } from "@/lib/pushClient";
 
 function Dashboard() {
   const router = useRouter();
@@ -106,6 +107,8 @@ function Dashboard() {
       typeof Notification !== "undefined" && Notification.permission === "granted"
     );
     setConnected(true);
+    // Register SW + refresh push subscription if already permitted.
+    resyncPush().catch(() => {});
 
     let cancelled = false;
 
@@ -231,9 +234,15 @@ function Dashboard() {
   };
 
   const enableAlerts = async () => {
-    if (typeof Notification === "undefined") return;
-    const perm = await Notification.requestPermission();
-    setAlertsOn(perm === "granted");
+    const result = await enablePush();
+    setAlertsOn(result === "granted");
+    if (result === "unsupported") {
+      alert(
+        "Push isn't supported here. On iPhone: open in Safari, tap Share → Add to Home Screen, then open the app and enable alerts."
+      );
+    } else if (result === "error") {
+      alert("Push is not configured on the server (missing VAPID key).");
+    }
   };
 
   return (

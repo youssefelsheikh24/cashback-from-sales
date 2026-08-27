@@ -5,6 +5,7 @@ import { generateReference } from "@/lib/reference";
 import { saveRequestFiles } from "@/lib/storage";
 import { sendRequestNotificationEmail } from "@/lib/email";
 import { broadcastNewRequest } from "@/lib/sse";
+import { sendPushToAll } from "@/lib/push";
 import { SERVICE_LABELS, SHOOT_SERVICES } from "@/lib/constants";
 import type { ServiceId } from "@/types";
 
@@ -169,6 +170,18 @@ export async function POST(req: NextRequest) {
       emailSent = result.sent;
     } catch (e) {
       console.error("Email notification failed (non-fatal):", e);
+    }
+
+    // Web Push to installed Sales PWAs (best-effort; never blocks submission).
+    try {
+      await sendPushToAll({
+        title: "New Production Request",
+        body: `${data.fullName} · ${data.brandName} — ${serviceSummary} · ${data.budget}`,
+        url: `/sales?requestId=${request.id}`,
+        tag: request.id,
+      });
+    } catch (e) {
+      console.error("Push notification failed (non-fatal):", e);
     }
 
     return NextResponse.json(

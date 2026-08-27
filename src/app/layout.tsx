@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Oswald } from "next/font/google";
 import "./globals.css";
 
@@ -21,7 +21,17 @@ export const metadata: Metadata = {
   title: "CashBack — Request a Production | Creative Production House",
   description:
     "Book a shoot, request a quote, or plan a production with CashBack — video production, photography, studios, locations, crew and full production, end to end.",
-  icons: { icon: "/logo.png" },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CashBack Sales",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#050505",
 };
 
 export default function RootLayout({
