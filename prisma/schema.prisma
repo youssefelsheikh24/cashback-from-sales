@@ -1,33 +1,26 @@
 // CashBack Sales & Production Request — Prisma schema
-// Deployed to Cloudflare Pages (edge) with Supabase Postgres.
+// Runtime: standard Node.js (Railway). Database: MongoDB Atlas (direct).
 //
-// SAFETY: every model is scoped to the ISOLATED "cashback_sales" schema via
-// @@schema. Prisma only manages objects inside that schema — the Supabase
-// "public" schema and everything else in the project is never touched.
+// SAFETY / ISOLATION: MongoDB has no SQL "schemas". Isolation is by DATABASE
+// NAME — the connection string points at a dedicated `cashback_sales` database
+// (see .env.example). Prisma only ever creates/reads collections inside that
+// database, so nothing else in the cluster is touched.
 // Docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  // multiSchema → keep all our tables in a dedicated, isolated schema.
-  // Edge execution is provided by Prisma Accelerate (HTTP), so no driver
-  // adapter / node TCP driver is needed — the client bundles cleanly for
-  // Cloudflare's edge runtime.
-  previewFeatures = ["multiSchema"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  // Runtime (edge): Supabase connection pooler (transaction mode, port 6543).
-  url       = env("DATABASE_URL")
-  // Migrations only (prisma migrate/db push): Supabase direct connection (5432).
-  directUrl = env("DIRECT_URL")
-  // The ONLY schema Prisma is allowed to create/alter/read. Nothing else.
-  schemas   = ["cashback_sales"]
+  provider = "mongodb"
+  // Direct MongoDB Atlas connection (mongodb+srv://…/cashback_sales). No
+  // Accelerate, no directUrl — Railway runs a normal Node.js runtime.
+  url = env("DATABASE_URL")
 }
 
 // A production/booking request submitted by a potential client.
 model ProductionRequest {
-  id        String @id @default(cuid())
+  id        String @id @default(cuid()) @map("_id")
   reference String @unique // Human-friendly ref e.g. CB-7F3A
 
   // ── Contact ──
@@ -66,12 +59,11 @@ model ProductionRequest {
   @@index([status])
   @@index([createdAt])
   @@index([email])
-  @@schema("cashback_sales")
 }
 
 // A Sales-facing notification raised when a new production request arrives.
 model Notification {
-  id        String             @id @default(cuid())
+  id        String             @id @default(cuid()) @map("_id")
   requestId String?
   request   ProductionRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
   title     String
@@ -85,18 +77,15 @@ model Notification {
 
   @@index([isRead])
   @@index([createdAt])
-  @@schema("cashback_sales")
 }
 
 // Authorized CashBack Sales team members who can access the CRM.
 model AdminUser {
-  id           String   @id @default(cuid())
+  id           String   @id @default(cuid()) @map("_id")
   email        String   @unique
   passwordHash String
   name         String   @default("CashBack Sales")
   role         String   @default("sales")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  @@schema("cashback_sales")
 }

@@ -1,11 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { withAccelerate } from "@prisma/extension-accelerate";
 import { hashPassword } from "../src/lib/password";
 
-// Seed runs locally (Node) and writes through Accelerate, same as the app.
-// DATABASE_URL must be the Accelerate `prisma://` URL. Schema/migrations
-// (prisma db push) use DIRECT_URL — see .env.example.
-const prisma = new PrismaClient().$extends(withAccelerate());
+// Seeds the sales login directly into MongoDB Atlas via DATABASE_URL.
+const prisma = new PrismaClient();
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL || "sales@cashback.agency").toLowerCase();

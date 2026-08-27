@@ -5,7 +5,6 @@ import { REQUEST_STATUSES } from "@/lib/validations";
 import { serializeRequest } from "@/lib/serialize";
 import type { Prisma } from "@prisma/client";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

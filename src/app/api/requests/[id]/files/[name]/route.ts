@@ -4,7 +4,6 @@ import { checkAdminAuth } from "@/lib/auth";
 import { signedUrlForFile } from "@/lib/storage";
 import { serializeRequest } from "@/lib/serialize";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

@@ -8,7 +8,6 @@ import { broadcastNewRequest } from "@/lib/sse";
 import { SERVICE_LABELS, SHOOT_SERVICES } from "@/lib/constants";
 import type { ServiceId } from "@/types";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

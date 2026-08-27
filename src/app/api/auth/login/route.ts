@@ -4,7 +4,6 @@ import { loginSchema } from "@/lib/validations";
 import { createSession } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {

@@ -3,7 +3,6 @@ import { prisma } from "@/lib/db";
 import { checkAdminAuth } from "@/lib/auth";
 import { z } from "zod";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET — recent notifications + unread count (Sales only). */

@@ -99,7 +99,7 @@ function Dashboard() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  /* ── Realtime via polling (edge-safe; no SSE/EventEmitter on Cloudflare) ── */
+  /* ── Realtime via lightweight polling of /api/notifications ── */
   const seenNotifIds = useRef<Set<string> | null>(null);
   useEffect(() => {
     setAlertsOn(
